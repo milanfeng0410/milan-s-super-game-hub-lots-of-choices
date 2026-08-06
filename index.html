@@ -92,6 +92,12 @@ border:3px solid cyan;
 ⚽ Soccer
 </button>
 
+<br>
+
+<button onclick="startGame('match3')">
+💎 Match-3
+</button>
+
 
 </div>
 
@@ -223,6 +229,12 @@ startArrow();
 if(g=="memory"){
 
 startMemory();
+
+}
+
+if(g=="match3"){
+
+startMatch3();
 
 }
 
@@ -1837,6 +1849,325 @@ ctx.textAlign="left";
 }
 }
 
+// =============================
+// MATCH-3
+// =============================
+
+const M3_COLS=8;
+const M3_ROWS=8;
+const M3_SIZE=56;
+const M3_X=Math.floor((900-M3_COLS*M3_SIZE)/2);
+const M3_Y=26;
+const M3_EMOJI=["🍎","🍊","🍏","🍇","🍓","🍌"];
+const M3_COLORS=["#ff5252","#ffa000","#66bb6a","#ab47bc","#ff5e7e","#fdd835"];
+
+let m3={
+  board:[],
+  off:[],
+  score:0,
+  target:500,
+  level:1,
+  moves:0,
+  combos:0,
+  selected:null,
+  animating:false,
+  levelUpTimer:0,
+  queue:[]
+};
+let m3SwapBack=null;
+
+function m3NewGem(){
+  return Math.floor(Math.random()*M3_EMOJI.length);
+}
+
+function m3InitBoard(){
+  m3.board=[];
+  m3.off=[];
+  for(let r=0;r<M3_ROWS;r++){
+    m3.board.push([]);
+    m3.off.push([]);
+    for(let c=0;c<M3_COLS;c++){
+      m3.board[r].push(m3NewGem());
+      m3.off[r].push(0);
+    }
+  }
+  let matches=m3FindMatches();
+  while(matches.length){
+    matches.forEach(([r,c])=>m3.board[r][c]=-1);
+    m3Gravity();
+    m3.animating=false;
+    for(let r=0;r<M3_ROWS;r++)for(let c=0;c<M3_COLS;c++)m3.off[r][c]=0;
+    matches=m3FindMatches();
+  }
+}
+
+function startMatch3(){
+  m3.score=0;
+  m3.target=500;
+  m3.level=1;
+  m3.moves=0;
+  m3.combos=0;
+  m3.selected=null;
+  m3.animating=false;
+  m3.levelUpTimer=0;
+  m3SwapBack=null;
+  m3.queue=[];
+  m3InitBoard();
+}
+
+function m3FindMatches(){
+  const matched={};
+  for(let r=0;r<M3_ROWS;r++){
+    for(let c=0;c<M3_COLS-2;c++){
+      const t=m3.board[r][c];
+      if(t<0)continue;
+      let len=1;
+      while(c+len<M3_COLS&&m3.board[r][c+len]===t)len++;
+      if(len>=3)for(let k=0;k<len;k++)matched[r+","+(c+k)]=true;
+      c+=len-1;
+    }
+  }
+  for(let c=0;c<M3_COLS;c++){
+    for(let r=0;r<M3_ROWS-2;r++){
+      const t=m3.board[r][c];
+      if(t<0)continue;
+      let len=1;
+      while(r+len<M3_ROWS&&m3.board[r+len][c]===t)len++;
+      if(len>=3)for(let k=0;k<len;k++)matched[(r+k)+","+c]=true;
+      r+=len-1;
+    }
+  }
+  return Object.keys(matched).map(k=>k.split(",").map(Number));
+}
+
+function m3RemoveMatches(list){
+  list.forEach(([r,c])=>m3.board[r][c]=-1);
+  m3.score+=list.length*10*m3.combos;
+}
+
+function m3Gravity(){
+  for(let c=0;c<M3_COLS;c++){
+    let write=M3_ROWS-1;
+    for(let r=M3_ROWS-1;r>=0;r--){
+      if(m3.board[r][c]>=0){
+        if(write!==r){
+          m3.board[write][c]=m3.board[r][c];
+          m3.board[r][c]=-1;
+          m3.off[write][c]=(write-r)*M3_SIZE;
+        }
+        write--;
+      }
+    }
+    for(let r=write;r>=0;r--){
+      m3.board[r][c]=m3NewGem();
+      m3.off[r][c]=(write+1)*M3_SIZE;
+    }
+  }
+}
+
+function m3Swap(r1,c1,r2,c2){
+  const t=m3.board[r1][c1];
+  m3.board[r1][c1]=m3.board[r2][c2];
+  m3.board[r2][c2]=t;
+  const matches=m3FindMatches();
+  if(matches.length){
+    m3.moves++;
+    m3.combos=1;
+    m3RemoveMatches(matches);
+    m3Gravity();
+    m3.animating=true;
+  }else{
+    const t2=m3.board[r1][c1];
+    m3.board[r1][c1]=m3.board[r2][c2];
+    m3.board[r2][c2]=t2;
+    m3SwapBack={r1:r1,c1:c1,r2:r2,c2:c2,t:0};
+  }
+}
+
+function m3CellFromClick(x,y){
+  const c=Math.floor((x-M3_X)/M3_SIZE);
+  const r=Math.floor((y-M3_Y)/M3_SIZE);
+  if(c<0||c>=M3_COLS||r<0||r>=M3_ROWS)return -1;
+  return r*M3_COLS+c;
+}
+
+function m3Click(x,y){
+  if(m3.animating||m3SwapBack||m3.levelUpTimer>0){
+    m3.queue.push({x:x,y:y});
+    return;
+  }
+  const idx=m3CellFromClick(x,y);
+  if(idx<0)return;
+  const r=Math.floor(idx/M3_COLS),c=idx%M3_COLS;
+  if(m3.selected===null){
+    m3.selected={r:r,c:c};
+    return;
+  }
+  const s=m3.selected;
+  if(s.r===r&&s.c===c){
+    m3.selected=null;
+    return;
+  }
+  if(Math.abs(s.r-r)+Math.abs(s.c-c)===1){
+    m3Swap(s.r,s.c,r,c);
+    m3.selected=null;
+  }else{
+    m3.selected={r:r,c:c};
+  }
+}
+
+function m3DrainQueue(){
+  while(m3.queue.length&&!m3.animating&&!m3SwapBack&&m3.levelUpTimer<=0){
+    const e=m3.queue.shift();
+    m3Click(e.x,e.y);
+  }
+}
+
+function updateMatch3(){
+  if(m3SwapBack){
+    m3SwapBack.t+=0.08;
+    if(m3SwapBack.t>=1)m3SwapBack=null;
+  }
+  if(m3.levelUpTimer>0)m3.levelUpTimer-=1/60;
+  if(m3.animating){
+    let done=true;
+    for(let r=0;r<M3_ROWS;r++)for(let c=0;c<M3_COLS;c++){
+      if(m3.off[r][c]!==0){
+        m3.off[r][c]-=m3.off[r][c]*0.3;
+        if(Math.abs(m3.off[r][c])<0.5)m3.off[r][c]=0;
+        else done=false;
+      }
+    }
+    if(done){
+      m3.animating=false;
+      const matches=m3FindMatches();
+      if(matches.length){
+        m3.combos++;
+        m3RemoveMatches(matches);
+        m3Gravity();
+        m3.animating=true;
+      }else{
+        m3.combos=0;
+        if(m3.score>=m3.target){
+          m3.level++;
+          m3.target=m3.level*500;
+          m3.levelUpTimer=1.5;
+        }
+      }
+    }
+  }
+  m3DrainQueue();
+}
+
+function m3DrawGem(x,y,type,scale){
+  ctx.save();
+  ctx.translate(x,y);
+  const r=24*scale;
+  ctx.shadowColor=M3_COLORS[type];
+  ctx.shadowBlur=12;
+  const g=ctx.createRadialGradient(-5,-5,2,0,0,r);
+  g.addColorStop(0,"#fff");
+  g.addColorStop(0.35,M3_COLORS[type]);
+  g.addColorStop(1,"#333");
+  ctx.fillStyle=g;
+  ctx.beginPath();
+  ctx.arc(0,0,r,0,Math.PI*2);
+  ctx.fill();
+  ctx.shadowBlur=0;
+  ctx.font=Math.round(26*scale)+"px Arial";
+  ctx.textAlign="center";
+  ctx.textBaseline="middle";
+  ctx.fillText(M3_EMOJI[type],0,2);
+  ctx.textAlign="left";
+  ctx.textBaseline="alphabetic";
+  ctx.restore();
+}
+
+function drawMatch3(){
+  const t=performance.now()/1000;
+  let bg=ctx.createLinearGradient(0,0,0,500);
+  bg.addColorStop(0,"#0b1a3e");
+  bg.addColorStop(0.5,"#2b1d5e");
+  bg.addColorStop(1,"#0f0a20");
+  ctx.fillStyle=bg;
+  ctx.fillRect(0,0,900,500);
+  for(let i=0;i<50;i++){
+    const tw=0.4+0.4*Math.sin(t*2+i*1.7);
+    ctx.globalAlpha=tw;
+    ctx.fillStyle="#fff";
+    ctx.fillRect((i*137)%900,(i*97)%400,2,2);
+  }
+  ctx.globalAlpha=1;
+  ctx.fillStyle="rgba(255,255,255,.06)";
+  ctx.fillRect(M3_X-6,M3_Y-6,M3_COLS*M3_SIZE+12,M3_ROWS*M3_SIZE+12);
+  ctx.strokeStyle="#7bdff2";
+  ctx.lineWidth=2;
+  ctx.strokeRect(M3_X-6,M3_Y-6,M3_COLS*M3_SIZE+12,M3_ROWS*M3_SIZE+12);
+  for(let r=0;r<M3_ROWS;r++)for(let c=0;c<M3_COLS;c++){
+    const type=m3.board[r][c];
+    if(type<0)continue;
+    let x=M3_X+c*M3_SIZE+M3_SIZE/2;
+    let y=M3_Y+r*M3_SIZE+M3_SIZE/2+m3.off[r][c];
+    if(m3SwapBack){
+      const sb=m3SwapBack;
+      const f=Math.sin(Math.PI*Math.min(1,sb.t));
+      if(sb.r1===r&&sb.c1===c){
+        x+=(sb.c2-sb.c1)*M3_SIZE*f;
+        y+=(sb.r2-sb.r1)*M3_SIZE*f;
+      }else if(sb.r2===r&&sb.c2===c){
+        x+=(sb.c1-sb.c2)*M3_SIZE*f;
+        y+=(sb.r1-sb.r2)*M3_SIZE*f;
+      }
+    }
+    m3DrawGem(x,y,type,1);
+  }
+  if(m3.selected){
+    const s=m3.selected;
+    ctx.strokeStyle="#fff";
+    ctx.lineWidth=3;
+    ctx.shadowColor="#fff";
+    ctx.shadowBlur=10;
+    ctx.strokeRect(M3_X+s.c*M3_SIZE+2,M3_Y+s.r*M3_SIZE+2,M3_SIZE-4,M3_SIZE-4);
+    ctx.shadowBlur=0;
+  }
+  const hue=(t*40)%360;
+  ctx.fillStyle="#fff";
+  ctx.shadowColor="hsl("+hue+",100%,60%)";
+  ctx.shadowBlur=8;
+  ctx.font="bold 24px Arial";
+  ctx.fillText("💎 MATCH-3",20,40);
+  ctx.shadowBlur=0;
+  ctx.fillStyle="#ffd84d";
+  ctx.font="18px Arial";
+  ctx.fillText("Score: "+m3.score,20,70);
+  ctx.fillStyle="#7bdff2";
+  ctx.fillText("Level "+m3.level+"   Target: "+m3.target+"   Moves: "+m3.moves,20,95);
+  ctx.fillStyle="rgba(255,255,255,.6)";
+  ctx.font="15px Arial";
+  ctx.fillText("Click a gem, then click a neighbor to swap",20,120);
+  if(m3.levelUpTimer>0){
+    ctx.fillStyle="rgba(0,0,0,.55)";
+    ctx.fillRect(0,0,900,500);
+    ctx.fillStyle="#ffe66d";
+    ctx.shadowColor="#ffe66d";
+    ctx.shadowBlur=16;
+    ctx.font="bold 42px Arial";
+    ctx.textAlign="center";
+    ctx.fillText("LEVEL "+m3.level+"!",450,220);
+    ctx.shadowBlur=0;
+    ctx.fillStyle="#fff";
+    ctx.font="22px Arial";
+    ctx.fillText("New target: "+m3.target+" points",450,260);
+    ctx.textAlign="left";
+  }
+}
+
+canvas.addEventListener("mousedown",function(e){
+  if(mode!="match3")return;
+  const rect=canvas.getBoundingClientRect();
+  m3Click(e.clientX-rect.left,e.clientY-rect.top);
+});
+
 // MAIN LOOP
 // =============================
 
@@ -1913,6 +2244,16 @@ if(mode=="memory"){
 updateMemory();
 
 drawMemory();
+
+
+}
+
+if(mode=="match3"){
+
+
+updateMatch3();
+
+drawMatch3();
 
 
 }
