@@ -3,6 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <title>Milan's website</title>
 </head>
 <body>
@@ -77,7 +80,7 @@ border:3px solid cyan;
 <br>
 
 <button onclick="startGame('arrow')">
-▶️ Geometry Arrow
+▶️ Geometry Arrow <span style="color:#ffd84d">(FLY v7)</span>
 </button>
 
 <br>
@@ -1468,40 +1471,49 @@ ctx.fill();
 
 // =============================
 // =============================
-// GEOMETRY ARROW (GD STYLE)
+// GEOMETRY ARROW (REAL WAVE)
 // =============================
 
 let arrow={
 x:150,
-y:340,
+y:220,
 vy:0,
-onGround:true,
+tilt:0,
 dead:false,
+deadT:0,
 score:0,
-speed:6
+speed:5
 };
+
+let arrowHeld=false;
 
 let arrowWalls=[];
 
 function makeArrowObstacle(x){
 const r=Math.random();
-if(r<0.40)return {x:x,type:"spike"};
-if(r<0.62)return {x:x,type:"block"};
-if(r<0.82)return {x:x,type:"spikewall",n:2+Math.floor(Math.random()*2)};
-return {x:x,type:"tall"};
+if(r<0.34){
+const gapH=140+Math.random()*80;
+const gapTop=40+Math.random()*(400-gapH);
+return {x:x,type:"gate",gapTop:gapTop,gapBot:gapTop+gapH};
+}
+if(r<0.54)return {x:x,type:"floorspike",n:1+Math.floor(Math.random()*3)};
+if(r<0.74)return {x:x,type:"ceilspike",n:1+Math.floor(Math.random()*3)};
+if(r<0.88)return {x:x,type:"floorwall",h:110+Math.random()*120};
+return {x:x,type:"ceilwall",h:110+Math.random()*120};
 }
 
 function startArrow(){
 arrow.x=150;
-arrow.y=340;
+arrow.y=220;
 arrow.vy=0;
-arrow.onGround=true;
+arrow.tilt=0;
 arrow.dead=false;
+arrow.deadT=0;
 arrow.score=0;
-arrow.speed=6;
+arrow.speed=5;
 arrowWalls=[];
 for(let i=0;i<6;i++){
-arrowWalls.push(makeArrowObstacle(650+i*250));
+arrowWalls.push(makeArrowObstacle(700+i*280));
 }
 }
 
@@ -1510,135 +1522,245 @@ if(arrow.dead){
 startArrow();
 return;
 }
-if(arrow.onGround){
-arrow.vy=-13;
-arrow.onGround=false;
-}
 }
 
-function obstacleW(o){
-if(o.type=="spikewall")return o.n*35;
-if(o.type=="spike")return 35;
-return 70;
+function arrowHit(o){
+const ax=arrow.x+4,ay=arrow.y+6,aw=22,ah=24;
+if(o.type=="gate"){
+return ax<o.x+70&&ax+aw>o.x&&(ay<o.gapTop||ay+ah>o.gapBot);
+}
+if(o.type=="floorspike"){
+const w=o.n*40;
+return ax<o.x+w&&ax+aw>o.x&&ay+ah>450;
+}
+if(o.type=="ceilspike"){
+const w=o.n*40;
+return ax<o.x+w&&ax+aw>o.x&&ay<50;
+}
+if(o.type=="floorwall"){
+return ax<o.x+45&&ax+aw>o.x&&ay+ah>490-o.h;
+}
+if(o.type=="ceilwall"){
+return ax<o.x+45&&ax+aw>o.x&&ay<o.h;
+}
+return false;
 }
 
 function updateArrow(){
-if(arrow.dead)return;
-arrow.vy+=0.7;
-arrow.y+=arrow.vy;
-if(arrow.y>=340){
-arrow.y=340;
-arrow.vy=0;
-arrow.onGround=true;
+if(arrow.dead){
+arrow.deadT+=1/60;
+if(arrow.deadT>0.6)startArrow();
+return;
 }
+const up=arrowHeld||keys["Space"]||keys["KeyW"]||keys["ArrowUp"];
+const targetV=up?-6:6;
+arrow.vy+=(targetV-arrow.vy)*0.12;
+arrow.y+=arrow.vy;
+arrow.y=Math.max(0,Math.min(490-32,arrow.y));
+const targTilt=Math.max(-0.85,Math.min(0.85,arrow.vy*0.14));
+arrow.tilt+=(targTilt-arrow.tilt)*0.3;
 arrowWalls.forEach(o=>o.x-=arrow.speed);
-if(arrowWalls.length&&arrowWalls[0].x<-60){
+if(arrowWalls.length&&arrowWalls[0].x<-90){
 arrowWalls.shift();
 const last=arrowWalls[arrowWalls.length-1].x;
-arrowWalls.push(makeArrowObstacle(Math.max(1100,last+150+Math.random()*100)));
+arrowWalls.push(makeArrowObstacle(Math.max(1200,last+260+Math.random()*120)));
 arrow.score++;
 }
-arrow.speed=6+Math.floor(arrow.score/10);
+arrow.speed=5+Math.floor(arrow.score/12);
 for(const o of arrowWalls){
-const w=obstacleW(o);
-if(arrow.x+30>o.x&&arrow.x<o.x+w){
-if(o.type=="spike"||o.type=="spikewall"){
-if(arrow.y+30>335)arrow.dead=true;
-}else if(o.type=="tall"){
-if(arrow.y+30>300)arrow.dead=true;
-}else if(o.type=="block"){
-if(arrow.y+30>=315&&arrow.y+30<=345&&arrow.vy>=0){
-arrow.y=290;
-arrow.vy=0;
-arrow.onGround=true;
-}else if(arrow.y+30>345){
-arrow.dead=true;
-}
-}
-}
+if(arrowHit(o)){arrow.dead=true;arrow.deadT=0;break;}
 }
 }
 
 function drawArrowPlayer(){
 ctx.save();
-ctx.shadowColor="#00ffff";
-ctx.shadowBlur=16;
-const g=ctx.createLinearGradient(arrow.x,arrow.y,arrow.x+32,arrow.y+32);
-g.addColorStop(0,"#66ffff");
-g.addColorStop(1,"#0088ff");
-ctx.fillStyle=g;
+ctx.translate(arrow.x+15,arrow.y+16);
+ctx.rotate(arrow.tilt);
+const t=performance.now()/1000;
+ctx.shadowBlur=0;
+for(let i=1;i<=6;i++){
+ctx.globalAlpha=0.5-i*0.075;
+ctx.fillStyle="hsl("+(((t*120)+i*50)%360)+",100%,65%)";
+ctx.fillRect(-12-i*7,-3,9+i*2,6);
+}
+ctx.globalAlpha=1;
+ctx.shadowColor="#ffffff";
+ctx.shadowBlur=22;
+ctx.fillStyle="#ffffff";
 ctx.beginPath();
-ctx.moveTo(arrow.x+32,arrow.y+16);
-ctx.lineTo(arrow.x,arrow.y);
-ctx.lineTo(arrow.x+8,arrow.y+16);
-ctx.lineTo(arrow.x,arrow.y+32);
+ctx.moveTo(16,0);
+ctx.lineTo(-11,-11);
+ctx.lineTo(-4,0);
+ctx.lineTo(-11,11);
 ctx.closePath();
 ctx.fill();
 ctx.shadowBlur=0;
-ctx.fillStyle="rgba(255,255,255,.6)";
+ctx.fillStyle="#ffd84d";
 ctx.beginPath();
-ctx.moveTo(arrow.x+26,arrow.y+16);
-ctx.lineTo(arrow.x+12,arrow.y+8);
-ctx.lineTo(arrow.x+15,arrow.y+16);
-ctx.lineTo(arrow.x+12,arrow.y+24);
+ctx.moveTo(-4,-6);
+ctx.lineTo(-13,0);
+ctx.lineTo(-4,6);
 ctx.closePath();
 ctx.fill();
 ctx.restore();
 }
 
+function drawArrowObstacle(o){
+ctx.save();
+if(o.type=="gate"){
+let g=ctx.createLinearGradient(o.x,0,o.x+70,0);
+g.addColorStop(0,"#5ef38c");
+g.addColorStop(1,"#00b359");
+ctx.fillStyle=g;
+ctx.shadowColor="#5ef38c";
+ctx.shadowBlur=12;
+ctx.fillRect(o.x,0,70,o.gapTop);
+ctx.fillRect(o.x,o.gapBot,70,490-o.gapBot);
+ctx.shadowBlur=0;
+ctx.fillStyle="rgba(255,255,255,.8)";
+    ctx.fillRect(o.x,o.gapTop-2,70,3);
+    ctx.fillRect(o.x,o.gapBot,70,3);
+    ctx.strokeStyle="rgba(255,255,255,.7)";
+    ctx.lineWidth=2;
+    ctx.strokeRect(o.x,0,70,o.gapTop);
+    ctx.strokeRect(o.x,o.gapBot,70,490-o.gapBot);
+  }else if(o.type=="floorspike"){
+    ctx.shadowColor="#ff2d78";
+    ctx.shadowBlur=12;
+    ctx.fillStyle="#ff2d78";
+    for(let i=0;i<o.n;i++){
+      const sx=o.x+i*40;
+      ctx.beginPath();
+      ctx.moveTo(sx,490);
+      ctx.lineTo(sx+40,490);
+      ctx.lineTo(sx+20,435);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle="rgba(255,255,255,.85)";
+      ctx.lineWidth=2;
+      ctx.stroke();
+    }
+  }else if(o.type=="ceilspike"){
+    ctx.shadowColor="#00e5ff";
+    ctx.shadowBlur=12;
+    ctx.fillStyle="#00e5ff";
+    for(let i=0;i<o.n;i++){
+      const sx=o.x+i*40;
+      ctx.beginPath();
+      ctx.moveTo(sx,0);
+      ctx.lineTo(sx+40,0);
+      ctx.lineTo(sx+20,55);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle="rgba(255,255,255,.85)";
+      ctx.lineWidth=2;
+      ctx.stroke();
+    }
+  }else if(o.type=="floorwall"){
+    let g=ctx.createLinearGradient(o.x,490-o.h,o.x,490);
+    g.addColorStop(0,"#ffb84d");
+    g.addColorStop(1,"#b35400");
+    ctx.fillStyle=g;
+    ctx.shadowColor="#ffb84d";
+    ctx.shadowBlur=12;
+    ctx.fillRect(o.x,490-o.h,45,o.h);
+    ctx.shadowBlur=0;
+    ctx.strokeStyle="rgba(255,255,255,.85)";
+    ctx.lineWidth=2;
+    ctx.strokeRect(o.x,490-o.h,45,o.h);
+    ctx.fillStyle="rgba(255,255,255,.4)";
+    ctx.fillRect(o.x+6,490-o.h,6,o.h);
+    ctx.fillStyle="#ffe66d";
+    ctx.fillRect(o.x,490-o.h,45,4);
+  }else if(o.type=="ceilwall"){
+    let g=ctx.createLinearGradient(o.x,0,o.x,o.h);
+    g.addColorStop(0,"#ffb84d");
+    g.addColorStop(1,"#b35400");
+    ctx.fillStyle=g;
+    ctx.shadowColor="#ffb84d";
+    ctx.shadowBlur=12;
+    ctx.fillRect(o.x,0,45,o.h);
+    ctx.shadowBlur=0;
+    ctx.strokeStyle="rgba(255,255,255,.85)";
+    ctx.lineWidth=2;
+    ctx.strokeRect(o.x,0,45,o.h);
+    ctx.fillStyle="rgba(255,255,255,.4)";
+    ctx.fillRect(o.x+6,0,6,o.h);
+    ctx.fillStyle="#ffe66d";
+    ctx.fillRect(o.x,o.h-4,45,4);
+  }
+ctx.restore();
+}
+
 function drawArrowGame(){
 const t=performance.now()/1000;
+const hue=(t*30)%360;
 let bg=ctx.createLinearGradient(0,0,0,500);
-bg.addColorStop(0,"#1a0b3e");
-bg.addColorStop(0.55,"#3b1d6e");
-bg.addColorStop(1,"#12081f");
+bg.addColorStop(0,"hsl("+hue+",55%,10%)");
+bg.addColorStop(0.5,"hsl("+((hue+80)%360)+",50%,14%)");
+bg.addColorStop(1,"hsl("+((hue+160)%360)+",55%,7%)");
 ctx.fillStyle=bg;
 ctx.fillRect(0,0,900,500);
-const scroll=arrowWalls[0]?arrowWalls[0].x:900;
-for(let i=0;i<60;i++){
-const tw=0.5+0.5*Math.sin(t*2+i*1.7);
-ctx.globalAlpha=tw*0.7;
-ctx.fillStyle="#fff";
-ctx.fillRect(((i*157-scroll*0.15)%900+900)%900,(i*91)%380,2,2);
+let glow=ctx.createLinearGradient(0,0,0,140);
+glow.addColorStop(0,"hsla("+hue+",100%,60%,.20)");
+glow.addColorStop(1,"rgba(0,0,0,0)");
+ctx.fillStyle=glow;
+ctx.fillRect(0,0,900,140);
+glow=ctx.createLinearGradient(0,500,0,360);
+glow.addColorStop(0,"hsla("+((hue+160)%360)+",100%,60%,.20)");
+glow.addColorStop(1,"rgba(0,0,0,0)");
+ctx.fillStyle=glow;
+ctx.fillRect(0,360,900,140);
+ctx.strokeStyle="rgba(255,255,255,.06)";
+ctx.lineWidth=1;
+for(let i=0;i<16;i++){
+const gx=((i*56-(t*arrow.speed*9)%900)%900+900)%900;
+ctx.beginPath();
+ctx.moveTo(gx,0);
+ctx.lineTo(gx,500);
+ctx.stroke();
+}
+for(let i=0;i<42;i++){
+const dx=((i*197-(t*arrow.speed*13)%900)%900+900)%900;
+const dy=(i*71)%470;
+ctx.globalAlpha=0.35+0.4*Math.sin(t*2+i*1.3);
+ctx.fillStyle="hsl("+((hue+i*27)%360)+",100%,70%)";
+ctx.fillRect(dx,dy,3,3);
 }
 ctx.globalAlpha=1;
-ctx.fillStyle="#00ffff";
-ctx.shadowColor="#00ffff";
-ctx.shadowBlur=12;
-ctx.fillRect(0,370,900,130);
+ctx.fillStyle="#00e5ff";
+ctx.shadowColor="#00e5ff";
+ctx.shadowBlur=16;
+ctx.fillRect(0,488,900,12);
+ctx.fillRect(0,0,900,12);
 ctx.shadowBlur=0;
-ctx.fillStyle="rgba(255,255,255,.25)";
-ctx.fillRect(0,370,900,4);
-ctx.fillStyle="#1a0b3e";
-for(let i=0;i<30;i++){
-ctx.fillRect((i*30)%900,372,14,6);
-}
-arrowWalls.forEach(o=>drawObstacle(o));
+arrowWalls.forEach(o=>drawArrowObstacle(o));
 drawArrowPlayer();
-const hue=(t*40)%360;
+if(arrow.dead){
+ctx.fillStyle="rgba(255,45,120,"+(0.25+0.2*Math.sin(t*30))+")";
+ctx.fillRect(0,0,900,500);
+}
 ctx.fillStyle="#fff";
 ctx.shadowColor="hsl("+hue+",100%,60%)";
 ctx.shadowBlur=8;
 ctx.font="25px Arial";
 ctx.fillText("Score: "+arrow.score,20,40);
-ctx.fillStyle="hsl("+hue+",100%,70%)";
+ctx.fillStyle="#7bdff2";
 ctx.font="16px Arial";
-ctx.fillText("SPACE / W / UP TO JUMP",20,70);
+ctx.fillText("HOLD SPACE TO FLY UP",20,70);
+ctx.fillText("FLY-v7",840,40);
 ctx.shadowBlur=0;
-if(arrow.dead){
-ctx.fillStyle="rgba(0,0,0,.4)";
-ctx.fillRect(0,0,900,500);
-ctx.fillStyle="#ff5e7e";
-ctx.shadowColor="#ff5e7e";
-ctx.shadowBlur=16;
-ctx.font="45px Arial";
-ctx.fillText("GAME OVER",280,200);
-ctx.shadowBlur=0;
-ctx.fillStyle="#ffe66d";
-ctx.font="25px Arial";
-ctx.fillText("SPACE TO RESTART",300,240);
 }
-}
+
+canvas.addEventListener("mousedown",function(e){
+if(mode!="arrow")return;
+if(arrow.dead){startArrow();return;}
+arrowHeld=true;
+});
+document.addEventListener("mouseup",function(e){
+arrowHeld=false;
+});
+
 
 // =============================
 // MEMORY MATCH (LEVELS)
