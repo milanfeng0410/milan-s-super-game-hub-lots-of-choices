@@ -101,6 +101,18 @@ border:3px solid cyan;
 💎 Match-3
 </button>
 
+<br>
+
+<button onclick="startGame('puzzle')">
+🧩 Picture Puzzle
+</button>
+
+<br>
+
+<button onclick="startGame('snake3')">
+🐍 Snake 3D
+</button>
+
 
 </div>
 
@@ -171,6 +183,12 @@ jumpArrow();
 
 }
 
+if(mode=="snake3" && e.code.indexOf("Arrow")===0){
+
+e.preventDefault();
+
+}
+
 });
 
 
@@ -238,6 +256,18 @@ startMemory();
 if(g=="match3"){
 
 startMatch3();
+
+}
+
+if(g=="puzzle"){
+
+startPuzzle();
+
+}
+
+if(g=="snake3"){
+
+startSnake3();
 
 }
 
@@ -2290,6 +2320,502 @@ canvas.addEventListener("mousedown",function(e){
   m3Click(e.clientX-rect.left,e.clientY-rect.top);
 });
 
+// =============================
+// PICTURE PUZZLE
+// =============================
+
+const PZ_N=4;
+const PZ_SIZE=120;
+const PZ_X=Math.floor((900-PZ_N*PZ_SIZE)/2);
+const PZ_Y=25;
+
+let pz={board:[],moves:0,time:0,done:false};
+let pzImg=document.createElement("canvas");
+pzImg.width=PZ_N*PZ_SIZE;
+pzImg.height=PZ_N*PZ_SIZE;
+
+function buildPuzzleImage(){
+  const c=pzImg.getContext("2d");
+  const W=PZ_N*PZ_SIZE,H=PZ_N*PZ_SIZE;
+  let g=c.createLinearGradient(0,0,0,H);
+  g.addColorStop(0,"#4fc3f7");
+  g.addColorStop(1,"#e1f5fe");
+  c.fillStyle=g;
+  c.fillRect(0,0,W,H);
+  c.fillStyle="#ffd54f";
+  c.beginPath();
+  c.arc(W*0.82,H*0.18,W*0.10,0,Math.PI*2);
+  c.fill();
+  c.strokeStyle="#ffe082";
+  c.lineWidth=8;
+  for(let i=0;i<12;i++){
+    const a=i/12*Math.PI*2;
+    c.beginPath();
+    c.moveTo(W*0.82+Math.cos(a)*W*0.11,H*0.18+Math.sin(a)*W*0.11);
+    c.lineTo(W*0.82+Math.cos(a)*W*0.16,H*0.18+Math.sin(a)*W*0.16);
+    c.stroke();
+  }
+  c.fillStyle="rgba(255,255,255,.9)";
+  c.beginPath();
+  c.arc(W*0.25,H*0.18,W*0.09,0,Math.PI*2);
+  c.arc(W*0.34,H*0.16,W*0.11,0,Math.PI*2);
+  c.arc(W*0.42,H*0.19,W*0.08,0,Math.PI*2);
+  c.fill();
+  c.fillStyle="rgba(255,255,255,.7)";
+  c.beginPath();
+  c.arc(W*0.65,H*0.30,W*0.07,0,Math.PI*2);
+  c.arc(W*0.72,H*0.28,W*0.09,0,Math.PI*2);
+  c.fill();
+  c.fillStyle="#90a4ae";
+  c.beginPath();
+  c.moveTo(0,H*0.55);
+  c.lineTo(W*0.22,H*0.30);
+  c.lineTo(W*0.38,H*0.55);
+  c.closePath();
+  c.fill();
+  c.fillStyle="#b0bec5";
+  c.beginPath();
+  c.moveTo(W*0.30,H*0.55);
+  c.lineTo(W*0.55,H*0.25);
+  c.lineTo(W*0.80,H*0.55);
+  c.closePath();
+  c.fill();
+  c.fillStyle="#8d6e63";
+  c.beginPath();
+  c.moveTo(W*0.60,H*0.60);
+  c.lineTo(W*0.85,H*0.35);
+  c.lineTo(W*1.0,H*0.52);
+  c.lineTo(W,H*0.60);
+  c.closePath();
+  c.fill();
+  c.fillStyle="#fff";
+  c.beginPath();
+  c.moveTo(W*0.45,H*0.36);
+  c.lineTo(W*0.55,H*0.25);
+  c.lineTo(W*0.65,H*0.36);
+  c.lineTo(W*0.55,H*0.42);
+  c.closePath();
+  c.fill();
+  c.fillStyle="#66bb6a";
+  c.fillRect(0,H*0.55,W,H*0.45);
+  c.fillStyle="#81c784";
+  for(let i=0;i<90;i++){
+    const x=Math.random()*W,y=H*0.55+Math.random()*H*0.45;
+    c.fillRect(x,y,3,2);
+  }
+  c.fillStyle="#e1f5fe";
+  c.beginPath();
+  c.moveTo(W*0.45,H*0.72);
+  c.bezierCurveTo(W*0.30,H*0.62,W*0.18,H*0.70,W*0.05,H*0.66);
+  c.lineTo(W*0.05,H*0.95);
+  c.bezierCurveTo(W*0.22,H*0.98,W*0.42,H*0.95,W*0.55,H*0.78);
+  c.closePath();
+  c.fill();
+  c.strokeStyle="#90caf9";
+  c.lineWidth=3;
+  for(let i=0;i<5;i++){
+    const y=H*0.72+i*0.045*H;
+    c.beginPath();
+    c.moveTo(W*0.12,y);
+    c.quadraticCurveTo(W*0.25,y+0.02*H,W*0.38,y);
+    c.stroke();
+  }
+  c.fillStyle="#5d4037";
+  c.fillRect(W*0.72,H*0.45,W*0.05,H*0.22);
+  c.fillStyle="#2e7d32";
+  c.beginPath();
+  c.arc(W*0.745,H*0.42,W*0.10,0,Math.PI*2);
+  c.fill();
+  c.fillStyle="#388e3c";
+  c.beginPath();
+  c.arc(W*0.70,H*0.46,W*0.08,0,Math.PI*2);
+  c.arc(W*0.79,H*0.44,W*0.09,0,Math.PI*2);
+  c.fill();
+  c.fillStyle="#ff7043";
+  for(let i=0;i<12;i++){
+    const x=0.1*W+Math.random()*0.5*W,y=H*0.60+Math.random()*0.25*H;
+    c.beginPath();
+    c.arc(x,y,4,0,Math.PI*2);
+    c.fill();
+  }
+  c.fillStyle="#f6d365";
+  for(let i=0;i<8;i++){
+    const x=0.55*W+Math.random()*0.4*W,y=H*0.62+Math.random()*0.2*H;
+    c.beginPath();
+    c.arc(x,y,3.5,0,Math.PI*2);
+    c.fill();
+  }
+}
+
+function startPuzzle(){
+  buildPuzzleImage();
+  pz.board=[];
+  for(let i=0;i<PZ_N*PZ_N;i++)pz.board.push(i);
+  for(let i=0;i<250;i++){
+    const blank=pz.board.indexOf(0);
+    const r=Math.floor(blank/PZ_N),c=blank%PZ_N;
+    const moves=[];
+    if(r>0)moves.push(blank-PZ_N);
+    if(r<PZ_N-1)moves.push(blank+PZ_N);
+    if(c>0)moves.push(blank-1);
+    if(c<PZ_N-1)moves.push(blank+1);
+    const n=moves[Math.floor(Math.random()*moves.length)];
+    pz.board[blank]=pz.board[n];
+    pz.board[n]=0;
+  }
+  pz.moves=0;
+  pz.time=0;
+  pz.done=false;
+}
+
+function puzzleClick(x,y){
+  if(pz.done){
+    startPuzzle();
+    return;
+  }
+  const c=Math.floor((x-PZ_X)/PZ_SIZE);
+  const r=Math.floor((y-PZ_Y)/PZ_SIZE);
+  if(c<0||c>=PZ_N||r<0||r>=PZ_N)return;
+  const idx=r*PZ_N+c;
+  const blank=pz.board.indexOf(0);
+  const br=Math.floor(blank/PZ_N),bc=blank%PZ_N;
+  if(Math.abs(br-r)+Math.abs(bc-c)===1){
+    pz.board[blank]=pz.board[idx];
+    pz.board[idx]=0;
+    pz.moves++;
+    if(pz.board.every((t,i)=>t===i))pz.done=true;
+  }
+}
+
+canvas.addEventListener("mousedown",function(e){
+  if(mode!="puzzle")return;
+  const rect=canvas.getBoundingClientRect();
+  puzzleClick(e.clientX-rect.left,e.clientY-rect.top);
+});
+
+function updatePuzzle(){
+  if(!pz.done)pz.time+=1/60;
+}
+
+function drawPuzzle(){
+  const t=performance.now()/1000;
+  let bg=ctx.createLinearGradient(0,0,0,500);
+  bg.addColorStop(0,"#0b1a3e");
+  bg.addColorStop(0.5,"#2b1d5e");
+  bg.addColorStop(1,"#0f0a20");
+  ctx.fillStyle=bg;
+  ctx.fillRect(0,0,900,500);
+  ctx.fillStyle="rgba(255,255,255,.06)";
+  ctx.fillRect(PZ_X-6,PZ_Y-6,PZ_N*PZ_SIZE+12,PZ_N*PZ_SIZE+12);
+  ctx.strokeStyle="#7bdff2";
+  ctx.lineWidth=2;
+  ctx.strokeRect(PZ_X-6,PZ_Y-6,PZ_N*PZ_SIZE+12,PZ_N*PZ_SIZE+12);
+  for(let i=0;i<pz.board.length;i++){
+    const tile=pz.board[i];
+    if(tile===0)continue;
+    const r=Math.floor(i/PZ_N),c=i%PZ_N;
+    const sr=Math.floor(tile/PZ_N),sc=tile%PZ_N;
+    ctx.drawImage(pzImg,sc*PZ_SIZE,sr*PZ_SIZE,PZ_SIZE,PZ_SIZE,PZ_X+c*PZ_SIZE,PZ_Y+r*PZ_SIZE,PZ_SIZE,PZ_SIZE);
+    ctx.strokeStyle="rgba(0,0,0,.4)";
+    ctx.lineWidth=2;
+    ctx.strokeRect(PZ_X+c*PZ_SIZE,PZ_Y+r*PZ_SIZE,PZ_SIZE,PZ_SIZE);
+  }
+  const hue=(t*40)%360;
+  ctx.fillStyle="#fff";
+  ctx.shadowColor="hsl("+hue+",100%,60%)";
+  ctx.shadowBlur=8;
+  ctx.font="bold 24px Arial";
+  ctx.fillText("🧩 PICTURE PUZZLE",20,40);
+  ctx.shadowBlur=0;
+  ctx.fillStyle="#ffd84d";
+  ctx.font="18px Arial";
+  const mm=Math.floor(pz.time/60),ss=Math.floor(pz.time%60);
+  ctx.fillText("Moves: "+pz.moves+"   Time: "+mm+":"+(ss<10?"0":"")+ss,20,70);
+  ctx.fillStyle="rgba(255,255,255,.6)";
+  ctx.font="15px Arial";
+  ctx.fillText("Click a tile next to the blank to slide it",20,95);
+  if(pz.done){
+    ctx.fillStyle="rgba(0,0,0,.55)";
+    ctx.fillRect(0,0,900,500);
+    ctx.fillStyle="#5ef38c";
+    ctx.shadowColor="#5ef38c";
+    ctx.shadowBlur=16;
+    ctx.font="bold 42px Arial";
+    ctx.textAlign="center";
+    ctx.fillText("🎉 YOU WIN!",450,220);
+    ctx.shadowBlur=0;
+    ctx.fillStyle="#fff";
+    ctx.font="24px Arial";
+    ctx.fillText("CLICK TO PLAY AGAIN",450,270);
+    ctx.textAlign="left";
+  }
+}
+
+// =============================
+// SNAKE 3D
+// =============================
+
+const S3_C=13;
+const S3_R=9;
+const S3_CELL=45;
+const S3_H=30;
+const S3_X0=-(S3_C/2)*S3_CELL;
+const S3_Z0=-(S3_R/2)*S3_CELL;
+
+let snake3={body:[],dir:{x:1,y:0},nextDir:{x:1,y:0},food:{x:7,y:4},score:0,dead:false,tick:0,speed:0.16,time:0};
+
+const s3Cam={a:0.6,e:0.6,dist:900,focal:640};
+
+function s3Reset(){
+  snake3.body=[
+    {x:Math.floor(S3_C/2),y:Math.floor(S3_R/2)},
+    {x:Math.floor(S3_C/2)-1,y:Math.floor(S3_R/2)},
+    {x:Math.floor(S3_C/2)-2,y:Math.floor(S3_R/2)}
+  ];
+  snake3.dir={x:1,y:0};
+  snake3.nextDir={x:1,y:0};
+  snake3.score=0;
+  snake3.dead=false;
+  snake3.tick=0;
+  snake3.speed=0.16;
+  snake3.time=0;
+  s3SpawnFood();
+}
+
+function s3SpawnFood(){
+  let x,y,ok;
+  do{
+    x=Math.floor(Math.random()*S3_C);
+    y=Math.floor(Math.random()*S3_R);
+    ok=!snake3.body.some(b=>b.x===x&&b.y===y);
+  }while(!ok);
+  snake3.food={x:x,y:y};
+}
+
+function startSnake3(){
+  s3Reset();
+}
+
+function s3Turn(){
+  const nd=snake3.nextDir;
+  if(nd.x===-snake3.dir.x&&nd.y===-snake3.dir.y)return;
+  if(nd.x===snake3.dir.x&&nd.y===snake3.dir.y)return;
+  snake3.dir={x:nd.x,y:nd.y};
+}
+
+function updateSnake3(){
+  const t=performance.now()/1000;
+  const head=snake3.body[0];
+  const hx=S3_X0+head.x*S3_CELL+S3_CELL/2;
+  const hz=S3_Z0+head.y*S3_CELL+S3_CELL/2;
+  const hp=s3Proj(hx,15,hz);
+  const outOfSight=hp.x<70||hp.x>830||hp.y<55||hp.y>445;
+  const baseA=0.6;
+  const targetA=outOfSight?Math.atan2(-hx,hz):baseA;
+  let diff=targetA-s3Cam.a;
+  diff=Math.atan2(Math.sin(diff),Math.cos(diff));
+  s3Cam.a+=diff*0.05;
+  if(snake3.dead)return;
+  if(keys["ArrowUp"]||keys["KeyW"])snake3.nextDir={x:0,y:-1};
+  else if(keys["ArrowDown"]||keys["KeyS"])snake3.nextDir={x:0,y:1};
+  else if(keys["ArrowLeft"]||keys["KeyA"])snake3.nextDir={x:-1,y:0};
+  else if(keys["ArrowRight"]||keys["KeyD"])snake3.nextDir={x:1,y:0};
+  snake3.tick+=1/60;
+  if(snake3.tick>=snake3.speed){
+    snake3.tick=0;
+    s3Turn();
+    const head=snake3.body[0];
+    const nx=head.x+snake3.dir.x;
+    const ny=head.y+snake3.dir.y;
+    if(nx<0||nx>=S3_C||ny<0||ny>=S3_R){
+      snake3.dead=true;
+      return;
+    }
+    if(snake3.body.some(b=>b.x===nx&&b.y===ny)){
+      snake3.dead=true;
+      return;
+    }
+    snake3.body.unshift({x:nx,y:ny});
+    if(nx===snake3.food.x&&ny===snake3.food.y){
+      snake3.score++;
+      snake3.speed=Math.max(0.09,0.16-snake3.score*0.004);
+      s3SpawnFood();
+    }else{
+      snake3.body.pop();
+    }
+  }
+}
+
+function s3Rot(px,py,pz){
+  const a=s3Cam.a,e=s3Cam.e;
+  const ca=Math.cos(a),sa=Math.sin(a),ce=Math.cos(e),se=Math.sin(e);
+  const x1=px*ca+pz*sa;
+  const z1=-px*sa+pz*ca;
+  const y2=py*ce-z1*se;
+  const z2=py*se+z1*ce;
+  return {x:x1,y:y2,z:z2};
+}
+
+function s3Proj(px,py,pz){
+  const r=s3Rot(px,py,pz);
+  const s=s3Cam.focal/(s3Cam.dist-r.z);
+  return {x:450+r.x*s,y:250-r.y*s,z:r.z,s:s};
+}
+
+function s3Fill(pts,color){
+  ctx.beginPath();
+  ctx.moveTo(pts[0].x,pts[0].y);
+  for(let i=1;i<pts.length;i++)ctx.lineTo(pts[i].x,pts[i].y);
+  ctx.closePath();
+  ctx.fillStyle=color;
+  ctx.fill();
+}
+
+function s3Block(x0,z0,w,d,h,colors,yoff){
+  const o=yoff||0;
+  const pts=[
+    s3Proj(x0,o,z0),
+    s3Proj(x0+w,o,z0),
+    s3Proj(x0+w,o,z0+d),
+    s3Proj(x0,o,z0+d),
+    s3Proj(x0,o+h,z0),
+    s3Proj(x0+w,o+h,z0),
+    s3Proj(x0+w,o+h,z0+d),
+    s3Proj(x0,o+h,z0+d)
+  ];
+  s3Fill([pts[4],pts[5],pts[6],pts[7]],colors.t);
+  const sa=Math.sin(s3Cam.a),ca=Math.cos(s3Cam.a);
+  if(sa<0)s3Fill([pts[1],pts[2],pts[6],pts[5]],colors.s1);
+  else s3Fill([pts[0],pts[3],pts[7],pts[4]],colors.s1);
+  if(ca>0)s3Fill([pts[2],pts[3],pts[7],pts[6]],colors.s2);
+  else s3Fill([pts[0],pts[1],pts[5],pts[4]],colors.s2);
+  return pts;
+}
+
+function s3BodyColors(i){
+  if(i===0)return {t:"#ffe082",s1:"#f57f17",s2:"#f9a825"};
+  const h=(140-i*3+360)%360;
+  return {t:"hsl("+h+",75%,50%)",s1:"hsl("+h+",75%,32%)",s2:"hsl("+h+",75%,22%)"};
+}
+
+function drawSnake3(){
+  const t=performance.now()/1000;
+  let bg=ctx.createLinearGradient(0,0,0,500);
+  bg.addColorStop(0,"#0b1a3e");
+  bg.addColorStop(0.5,"#2b1d5e");
+  bg.addColorStop(1,"#0f0a20");
+  ctx.fillStyle=bg;
+  ctx.fillRect(0,0,900,500);
+  for(let i=0;i<60;i++){
+    const tw=0.3+0.4*Math.sin(t*2+i*1.7);
+    ctx.globalAlpha=tw;
+    ctx.fillStyle="#fff";
+    ctx.fillRect((i*137)%900,(i*97)%400,2,2);
+  }
+  ctx.globalAlpha=1;
+  s3Fill([
+    s3Proj(S3_X0-18,0,S3_Z0-18),
+    s3Proj(S3_X0-18+S3_C*S3_CELL+36,0,S3_Z0-18),
+    s3Proj(S3_X0-18+S3_C*S3_CELL+36,0,S3_Z0-18+S3_R*S3_CELL+36),
+    s3Proj(S3_X0-18,0,S3_Z0-18+S3_R*S3_CELL+36)
+  ],"rgba(0,0,0,.5)");
+  for(let gx=0;gx<S3_C;gx++){
+    for(let gy=0;gy<S3_R;gy++){
+      const x0=S3_X0+gx*S3_CELL;
+      const z0=S3_Z0+gy*S3_CELL;
+      const col=(gx+gy)%2===0?"#2e7d32":"#388e3c";
+      s3Fill([
+        s3Proj(x0,0,z0),
+        s3Proj(x0+S3_CELL,0,z0),
+        s3Proj(x0+S3_CELL,0,z0+S3_CELL),
+        s3Proj(x0,0,z0+S3_CELL)
+      ],col);
+    }
+  }
+  const drawList=[];
+  for(let i=snake3.body.length-1;i>=0;i--){
+    const b=snake3.body[i];
+    const x0=S3_X0+b.x*S3_CELL;
+    const z0=S3_Z0+b.y*S3_CELL;
+    const colors=s3BodyColors(i);
+    const pc=s3Proj(x0+S3_CELL/2,0,z0+S3_CELL/2);
+    drawList.push({d:pc.z,fn:function(){s3Block(x0,z0,S3_CELL,S3_CELL,S3_H,colors,0);}});
+  }
+  const fx=S3_X0+snake3.food.x*S3_CELL;
+  const fz=S3_Z0+snake3.food.y*S3_CELL;
+  const fy=Math.sin(t*3)*10+10;
+  const fpc=s3Proj(fx+S3_CELL/2,fy,fz+S3_CELL/2);
+  drawList.push({d:fpc.z,fn:function(){
+    ctx.shadowColor="#ff5252";
+    ctx.shadowBlur=18;
+    s3Block(fx+S3_CELL*0.2,fz+S3_CELL*0.2,S3_CELL*0.6,S3_CELL*0.6,22,{t:"#ff8a80",s1:"#d32f2f",s2:"#c62828"},fy);
+    ctx.shadowBlur=0;
+  }});
+  drawList.sort(function(a,b){return b.d-a.d;});
+  drawList.forEach(function(item){item.fn();});
+  const head=snake3.body[0];
+  const hx=S3_X0+head.x*S3_CELL;
+  const hz=S3_Z0+head.y*S3_CELL;
+  const cx=hx+S3_CELL/2,cz=hz+S3_CELL/2;
+  const topPts=[
+    s3Proj(hx,S3_H,hz),
+    s3Proj(hx+S3_CELL,S3_H,hz),
+    s3Proj(hx+S3_CELL,S3_H,hz+S3_CELL),
+    s3Proj(hx,S3_H,hz+S3_CELL)
+  ];
+  const cornerG=[
+    {x:hx,z:hz},
+    {x:hx+S3_CELL,z:hz},
+    {x:hx+S3_CELL,z:hz+S3_CELL},
+    {x:hx,z:hz+S3_CELL}
+  ];
+  const dv={x:snake3.dir.x,y:snake3.dir.y};
+  const scores=cornerG.map(function(cg){return (cg.x-cx)*dv.x+(cg.z-cz)*dv.y;});
+  const order=[0,1,2,3].sort(function(a,b){return scores[b]-scores[a];});
+  ctx.fillStyle="#333";
+  ctx.shadowBlur=0;
+  [order[0],order[1]].forEach(function(k){
+    const p=topPts[k];
+    const r=Math.max(3,7*p.s);
+    ctx.beginPath();
+    ctx.arc(p.x,p.y,r,0,Math.PI*2);
+    ctx.fill();
+  });
+  const hue=(t*40)%360;
+  ctx.fillStyle="#fff";
+  ctx.shadowColor="hsl("+hue+",100%,60%)";
+  ctx.shadowBlur=8;
+  ctx.font="bold 24px Arial";
+  ctx.fillText("🐍 SNAKE 3D",20,40);
+  ctx.shadowBlur=0;
+  ctx.fillStyle="#ffd84d";
+  ctx.font="18px Arial";
+  ctx.fillText("Score: "+snake3.score+"   Speed: "+snake3.speed.toFixed(2),20,70);
+  ctx.fillStyle="rgba(255,255,255,.6)";
+  ctx.font="15px Arial";
+  ctx.fillText("ARROWS / WASD to move",20,95);
+  if(snake3.dead){
+    ctx.fillStyle="rgba(0,0,0,.55)";
+    ctx.fillRect(0,0,900,500);
+    ctx.fillStyle="#ff5252";
+    ctx.shadowColor="#ff5252";
+    ctx.shadowBlur=16;
+    ctx.font="bold 42px Arial";
+    ctx.textAlign="center";
+    ctx.fillText("💀 GAME OVER",450,220);
+    ctx.shadowBlur=0;
+    ctx.fillStyle="#fff";
+    ctx.font="24px Arial";
+    ctx.fillText("Score: "+snake3.score+"   CLICK TO RESTART",450,270);
+    ctx.textAlign="left";
+  }
+}
+
+canvas.addEventListener("mousedown",function(e){
+  if(mode!="snake3")return;
+  if(snake3.dead)startSnake3();
+});
+
 // MAIN LOOP
 // =============================
 
@@ -2376,6 +2902,26 @@ if(mode=="match3"){
 updateMatch3();
 
 drawMatch3();
+
+
+}
+
+if(mode=="puzzle"){
+
+
+updatePuzzle();
+
+drawPuzzle();
+
+
+}
+
+if(mode=="snake3"){
+
+
+updateSnake3();
+
+drawSnake3();
 
 
 }
